@@ -1,0 +1,12 @@
+---
+title: "Dataset Report"
+output: html_document
+params:
+    dataset: "iris"
+---
+
+# Plotting `r params$dataset` dataset
+
+```{r, echo=FALSE}
+plot(get(params$dataset))
+```
