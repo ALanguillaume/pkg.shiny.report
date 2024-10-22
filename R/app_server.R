@@ -6,43 +6,60 @@
 #' @importFrom rmarkdown render
 #' @noRd
 app_server <- function(input, output, session) {
-  # Your application server logic
-
   r_local <- reactiveValues(
-    path_temp_dir = NULL
+    report_render_iteration = 0
+  )
+
+  temp_paths <- initialize_render_temp_dir(
+    session = session
+  )
+  resource_path_prefix <- "temp_dir_render_html"
+  addResourcePath(
+    prefix = resource_path_prefix,
+    directoryPath = temp_paths$path_temp_dir
   )
 
   observeEvent(
     input$dataset,
     {
-      path_temp_dir <- tempfile(pattern = "report")
-      dir.create(path_temp_dir)
-      path_temp_template <- file.path(
-        path_temp_dir,
-        "template.Rmd"
-      )
-      file.copy(
-        from = app_sys("template.Rmd"),
-        to = path_temp_template
-      )
-      path_html_report <- rmarkdown::render(
-        input = path_temp_template,
+      r_local$path_html_report <- rmarkdown::render(
+        input = temp_paths$path_temp_template,
         params = list(dataset = input$dataset)
       )
-
-      r_local$path_temp_dir <- path_temp_dir
+      r_local$report_render_iteration <- r_local$report_render_iteration + 1
     }
   )
 
   output$report <- renderUI({
-    addResourcePath(
-      prefix = "temp_dir_render_html",
-      directoryPath = r_local$path_temp_dir
-    )
+    r_local$report_render_iteration
     tags$iframe(
-      src = "temp_dir_render_html/template.html",
+      src = file.path(resource_path_prefix, "template.html"),
       height = "1000px",
       width = "800px"
     )
   })
+}
+
+
+initialize_render_temp_dir <- function(session = shiny::getDefaultReactiveDomain()) {
+  path_temp_dir <- tempfile(pattern = "report_")
+  dir.create(path_temp_dir)
+  path_temp_template <- file.path(
+    path_temp_dir,
+    "template.Rmd"
+  )
+  file.copy(
+    from = app_sys("template.Rmd"),
+    to = path_temp_template
+  )
+
+  # Cleanup the temp folder when the app exits
+  session$onSessionEnded(function() {
+    unlink(path_temp_dir, recursive = TRUE)
+  })
+
+  list(
+    path_temp_dir = path_temp_dir,
+    path_temp_template = path_temp_template
+  )
 }
